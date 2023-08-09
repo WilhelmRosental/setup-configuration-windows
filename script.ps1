@@ -1,0 +1,1 @@
+Install-Module -Force -Name Terminal-Icons -Repository PSGallery

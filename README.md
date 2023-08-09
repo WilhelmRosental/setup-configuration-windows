@@ -1,0 +1,3 @@
+- dns
+- désactiver l'amélioration de la précision de souris
+- désactiver veille
