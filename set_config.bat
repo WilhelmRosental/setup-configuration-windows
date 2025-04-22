@@ -1,64 +1,128 @@
-@REM On désactive le démarrage rapide
-
 @echo off
-echo Désactivation du démarrage rapide...
-reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f
-echo Le démarrage rapide est maintenant désactivé.
+REM ============================
+REM Vérification des privilèges administrateur
+REM ============================
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Ce script doit etre execute en tant qu'administrateur.
+    pause
+    exit /b
+)
 
-@REM On l'amélioration de la précision du pointeur
+REM ============================
+REM Vérification de la version de Windows (11 ou plus)
+REM ============================
+ver | findstr /i "10.0.22" >nul && (
+    echo Windows 11 ou version plus recente detectee.
+) || (
+    echo Ce script est concu pour Windows 11 ou une version plus recente.
+    pause
+    exit /b
+)
 
-@echo off
-echo Désactivation de l'amélioration de la précision du pointeur...
+REM ============================
+REM Désactivation du démarrage rapide
+REM ============================
+echo.
+echo [1/7] Désactivation du démarrage rapide...
+reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f >nul
+if %errorlevel%==0 (
+    echo Le démarrage rapide est maintenant désactivé.
+) else (
+    echo Erreur lors de la désactivation du démarrage rapide.
+)
+
+REM ============================
+REM Désactivation de la veille, veille prolongée et veille hybride
+REM ============================
+echo [2/7] Désactivation de la veille, veille prolongée et veille hybride...
+powercfg /hibernate off
+if %errorlevel%==0 (
+    echo Veille prolongée désactivée.
+) else (
+    echo Erreur lors de la désactivation de la veille prolongée.
+)
+powercfg /change standby-timeout-ac 0
+powercfg /change standby-timeout-dc 0
+powercfg /change monitor-timeout-ac 0
+powercfg /change monitor-timeout-dc 0
+powercfg /change hibernate-timeout-ac 0
+powercfg /change hibernate-timeout-dc 0
+powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0
+powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0
+powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE 0
+powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE 0
+powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP HYBRIDSLEEP 0
+powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP HYBRIDSLEEP 0
+powercfg /setactive SCHEME_CURRENT
+echo Veille, veille prolongée et veille hybride désactivées.
+
+REM ============================
+REM Désactivation de l'amélioration de la précision du pointeur (accélération souris)
+REM ============================
+echo [3/7] Désactivation de l'amélioration de la précision du pointeur...
 reg add "HKEY_CURRENT_USER\Control Panel\Mouse" /v MouseSpeed /t REG_SZ /d 0 /f
+if %errorlevel%==0 (
+    echo MouseSpeed désactivé.
+) else (
+    echo Erreur lors de la désactivation de MouseSpeed.
+)
 reg add "HKEY_CURRENT_USER\Control Panel\Mouse" /v MouseThreshold1 /t REG_SZ /d 0 /f
+if %errorlevel%==0 (
+    echo MouseThreshold1 désactivé.
+) else (
+    echo Erreur lors de la désactivation de MouseThreshold1.
+)
 reg add "HKEY_CURRENT_USER\Control Panel\Mouse" /v MouseThreshold2 /t REG_SZ /d 0 /f
+if %errorlevel%==0 (
+    echo MouseThreshold2 désactivé.
+) else (
+    echo Erreur lors de la désactivation de MouseThreshold2.
+)
+REM Désactivation de l'amélioration du pointeur (affichage)
+reg add "HKEY_CURRENT_USER\Control Panel\Mouse" /v MouseEnhancePointer /t REG_SZ /d 0 /f
+if %errorlevel%==0 (
+    echo MouseEnhancePointer désactivé.
+) else (
+    echo Erreur lors de la désactivation de MouseEnhancePointer.
+)
 echo L'amélioration de la précision du pointeur est désactivée.
 
-@REM configuration du dns cloudflare
+REM ============================
+REM Configuration DNS Cloudflare sur toutes les interfaces actives
+REM ============================
+echo [4/7] Configuration des serveurs DNS Cloudflare...
+powershell -ExecutionPolicy Bypass -File "%~dp0\set_dns_cloudflare.ps1"
+if %errorlevel%==0 (
+    echo DNS Cloudflare configures.
+) else (
+    echo Erreur lors de la configuration DNS.
+)
 
-@echo off
-set EthernetName="Ethernet"
-echo Configuration des serveurs DNS Cloudflare en IPv4 et IPv6 pour %EthernetName%...
-netsh interface ipv4 set dns name="%EthernetName%" static 1.1.1.1
-netsh interface ipv4 add dns name="%EthernetName%" 1.0.0.1 index=2
-netsh interface ipv6 set dns name="%EthernetName%" static 2606:4700:4700::1111
-netsh interface ipv6 add dns name="%EthernetName%" 2606:4700:4700::1001 index=2
-echo Serveurs DNS Cloudflare configurés en IPv4 et IPv6 pour %EthernetName%.
+REM ============================
+REM Installation de Oh My Posh via winget
+REM ============================
+echo [5/7] Installation de Oh My Posh via winget...
+where winget >nul 2>&1
+if %errorlevel%==0 (
+    winget install JanDeDobbeleer.OhMyPosh -e --accept-package-agreements --accept-source-agreements
+    echo Installation terminee.
+) else (
+    echo winget n'est pas disponible sur ce systeme.
+)
 
-@REM configuration du dns cloudflare
+REM ============================
+REM Installation des icônes du terminal et configuration du profil PowerShell
+REM ============================
+echo [6/7] Installation de Terminal-Icons et configuration du profil PowerShell...
+powershell -ExecutionPolicy Bypass -File "%~dp0\install_terminal_icons.ps1"
 
-@echo off
-FOR /F "tokens=2 delims==" %%A in ('wmic cpu get NumberOfCores /value ^| findstr /r "[0-9]"') do set "MaxProcessors=%%A"
-echo Le nombre maximal de processeurs est %MaxProcessors%.
-pause
+REM ============================
+REM Configuration du profil PowerShell pour Oh My Posh et Terminal-Icons
+REM ============================
+echo [7/7] Configuration du profil PowerShell...
+powershell -ExecutionPolicy Bypass -File "%~dp0\set_powershell_profile.ps1"
 
-@REM @echo off
-@REM bcdedit /set numproc 0
-@REM bcdedit /set useplatformclock true
-@REM echo Options avancées du démarrage modifiées pour utiliser le nombre maximum de processeurs.
-@REM pause
-
-@REM @echo off
-@REM echo Installation de Google Chrome via winget...
-@REM winget install Google.Chrome -e
-@REM echo Installation terminée.
-@REM pause
-
-@REM On install oh-my-posh pour le terminal
-
-@echo off
-echo Installation de Oh My Posh via winget...
-winget install XP8K0HKJFRXGCK
-echo Installation terminée.
-
-@echo off
-set "PowerShellProfilePath=%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
-echo oh-my-posh init pwsh --config "$env:POSH_THEMES_PATH\dracula.omp.json" ^| Invoke-Expression > "%PowerShellProfilePath%"
-echo Fichier Microsoft.PowerShell_profile.ps1 créé dans le dossier Documents de l'utilisateur actuel.
-
-@echo off
-REM Détermination du chemin d'accès du dossier parent
-set "ParentFolder=%~dp0"
-REM Exécution du script PowerShell depuis le dossier parent
-powershell -ExecutionPolicy Bypass -File "%ParentFolder%\install_terminal_icons.ps1"
+echo.
+echo Configuration terminee ! Redemarrez votre terminal pour appliquer les changements.
 pause

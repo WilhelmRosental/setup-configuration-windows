@@ -1,3 +1,3 @@
 - dns
 - désactiver l'amélioration de la précision de souris
-- désactiver veille
+- désactiver veille (veille, veille prolongée, veille hybride)
